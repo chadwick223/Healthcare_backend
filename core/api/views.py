@@ -3,10 +3,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Doctor, Patient
+from core.models import Doctor, Patient, PatientDoctorMapping
 from core.api.serializers import (
     DoctorSerializer,
     LoginSerializer,
+    PatientDoctorMappingSerializer,
     PatientSerializer,
     RegisterSerializer,
 )
@@ -201,6 +202,65 @@ class DoctorDetailView(APIView):
         doctor.delete()
         return Response(
             {"message": "Doctor record deleted successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PatientDoctorMappingListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        mappings = (
+            PatientDoctorMapping.objects.filter(patient__created_by=request.user)
+            .select_related('patient', 'doctor')
+            .order_by('-assigned_at')
+        )
+        serializer = PatientDoctorMappingSerializer(mappings, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = PatientDoctorMappingSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            mapping = serializer.save()
+            return Response(
+                {
+                    "message": "Doctor assigned to patient successfully",
+                    "mapping": PatientDoctorMappingSerializer(mapping).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PatientDoctorMappingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        # pk is patient_id: get all doctors assigned to this specific patient
+        patient = Patient.objects.filter(id=pk, created_by=request.user).first()
+        if patient is None:
+            return Response(
+                {"error": "Patient not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        mappings = PatientDoctorMapping.objects.filter(patient=patient).select_related('doctor')
+        doctors = []
+        for m in mappings:
+            doctors.append(m.doctor)
+        serializer = DoctorSerializer(doctors, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        # pk is mapping_id: remove a doctor from a patient
+        mapping = PatientDoctorMapping.objects.filter(id=pk, patient__created_by=request.user).first()
+        if mapping is None:
+            return Response(
+                {"error": "Mapping not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        mapping.delete()
+        return Response(
+            {"message": "Doctor removed from patient successfully."},
             status=status.HTTP_200_OK,
         )
 

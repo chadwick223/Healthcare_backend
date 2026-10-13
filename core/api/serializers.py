@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from core.models import Doctor, Patient
+from core.models import Doctor, Patient, PatientDoctorMapping
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -141,3 +141,57 @@ class DoctorSerializer(serializers.Serializer):
         instance.experience_years = validated_data.get('experience_years', instance.experience_years)
         instance.save()
         return instance
+
+
+class PatientDoctorMappingSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    patient = PatientSerializer(read_only=True)
+    doctor = DoctorSerializer(read_only=True)
+    assigned_at = serializers.DateTimeField(read_only=True)
+
+    def to_internal_value(self, data):
+        patient_val = data.get('patient')
+        if not patient_val:
+            patient_val = data.get('patient_id')
+        if not patient_val:
+            raise serializers.ValidationError({"patient": "This field is required."})
+
+        doctor_val = data.get('doctor')
+        if not doctor_val:
+            doctor_val = data.get('doctor_id')
+        if not doctor_val:
+            raise serializers.ValidationError({"doctor": "This field is required."})
+
+        return {
+            "patient_id": patient_val,
+            "doctor_id": doctor_val,
+        }
+
+    def validate(self, attrs):
+        patient_val = attrs.get('patient_id')
+        doctor_val = attrs.get('doctor_id')
+
+        request = self.context.get('request')
+        patient = Patient.objects.filter(id=patient_val).first()
+        if patient is None:
+            raise serializers.ValidationError({"patient": "Patient does not exist."})
+        if request and patient.created_by != request.user:
+            raise serializers.ValidationError({"patient": "You can only assign doctors to patients you created."})
+
+        doctor = Doctor.objects.filter(id=doctor_val).first()
+        if doctor is None:
+            raise serializers.ValidationError({"doctor": "Doctor does not exist."})
+
+        mapping_exists = PatientDoctorMapping.objects.filter(patient=patient, doctor=doctor).exists()
+        if mapping_exists:
+            raise serializers.ValidationError("This doctor is already assigned to this patient.")
+
+        attrs['patient_instance'] = patient
+        attrs['doctor_instance'] = doctor
+        return attrs
+
+    def create(self, validated_data):
+        patient = validated_data['patient_instance']
+        doctor = validated_data['doctor_instance']
+        return PatientDoctorMapping.objects.create(patient=patient, doctor=doctor)
+
