@@ -3,8 +3,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.models import Patient
+from core.models import Doctor, Patient
 from core.api.serializers import (
+    DoctorSerializer,
     LoginSerializer,
     PatientSerializer,
     RegisterSerializer,
@@ -119,6 +120,87 @@ class PatientDetailView(APIView):
         patient.delete()
         return Response(
             {"message": "Patient record deleted successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class DoctorListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        doctors = Doctor.objects.all().order_by('-created_at')
+        serializer = DoctorSerializer(doctors, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = DoctorSerializer(data=request.data)
+        if serializer.is_valid():
+            doctor = serializer.save(created_by=request.user)
+            return Response(
+                {
+                    "message": "Doctor added successfully",
+                    "doctor": DoctorSerializer(doctor).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DoctorDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        return Doctor.objects.filter(id=pk).first()
+
+    def get(self, request, pk):
+        doctor = self.get_object(pk)
+        if doctor is None:
+            return Response(
+                {"error": "Doctor not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = DoctorSerializer(doctor)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        doctor = self.get_object(pk)
+        if doctor is None:
+            return Response(
+                {"error": "Doctor not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if doctor.created_by != request.user:
+            return Response(
+                {"error": "You do not have permission to update this doctor record."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = DoctorSerializer(doctor, data=request.data)
+        if serializer.is_valid():
+            updated_doctor = serializer.save()
+            return Response(
+                {
+                    "message": "Doctor updated successfully",
+                    "doctor": DoctorSerializer(updated_doctor).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        doctor = self.get_object(pk)
+        if doctor is None:
+            return Response(
+                {"error": "Doctor not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if doctor.created_by != request.user:
+            return Response(
+                {"error": "You do not have permission to delete this doctor record."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        doctor.delete()
+        return Response(
+            {"message": "Doctor record deleted successfully."},
             status=status.HTTP_200_OK,
         )
 
