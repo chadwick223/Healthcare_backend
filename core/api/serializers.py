@@ -150,17 +150,30 @@ class PatientDoctorMappingSerializer(serializers.Serializer):
     assigned_at = serializers.DateTimeField(read_only=True)
 
     def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"non_field_errors": "Expected a dictionary of items."})
+
         patient_val = data.get('patient')
-        if not patient_val:
+        if patient_val is None or patient_val == "":
             patient_val = data.get('patient_id')
-        if not patient_val:
+        if patient_val is None or patient_val == "":
             raise serializers.ValidationError({"patient": "This field is required."})
 
+        try:
+            patient_val = int(patient_val)
+        except (ValueError, TypeError):
+            raise serializers.ValidationError({"patient": "A valid integer is required."})
+
         doctor_val = data.get('doctor')
-        if not doctor_val:
+        if doctor_val is None or doctor_val == "":
             doctor_val = data.get('doctor_id')
-        if not doctor_val:
+        if doctor_val is None or doctor_val == "":
             raise serializers.ValidationError({"doctor": "This field is required."})
+
+        try:
+            doctor_val = int(doctor_val)
+        except (ValueError, TypeError):
+            raise serializers.ValidationError({"doctor": "A valid integer is required."})
 
         return {
             "patient_id": patient_val,
