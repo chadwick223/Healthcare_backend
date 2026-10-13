@@ -4,6 +4,8 @@ from core.api.views import (
     DoctorListCreateView,
     LoginView,
     PatientDetailView,
+    PatientDoctorMappingDetailView,
+    PatientDoctorMappingListCreateView,
     PatientListCreateView,
     RegisterView,
 )
@@ -30,4 +32,12 @@ urlpatterns = [
     # Doctor item endpoints (GET detail, PUT update, DELETE)
     path('doctors/<int:pk>/', DoctorDetailView.as_view(), name='doctor-detail'),
     path('doctors/<int:pk>', DoctorDetailView.as_view(), name='doctor-detail-noslash'),
+
+    # Mapping collection endpoints (GET list, POST assign)
+    path('mappings/', PatientDoctorMappingListCreateView.as_view(), name='mapping-list-create'),
+    path('mappings', PatientDoctorMappingListCreateView.as_view(), name='mapping-list-create-noslash'),
+
+    # Mapping item endpoints (GET doctors for patient, DELETE remove mapping)
+    path('mappings/<int:pk>/', PatientDoctorMappingDetailView.as_view(), name='mapping-detail'),
+    path('mappings/<int:pk>', PatientDoctorMappingDetailView.as_view(), name='mapping-detail-noslash'),
 ]
