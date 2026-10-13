@@ -1,5 +1,7 @@
 from django.urls import path
 from core.api.views import (
+    DoctorDetailView,
+    DoctorListCreateView,
     LoginView,
     PatientDetailView,
     PatientListCreateView,
@@ -20,4 +22,12 @@ urlpatterns = [
     # Patient item endpoints (GET detail, PUT update, DELETE)
     path('patients/<int:pk>/', PatientDetailView.as_view(), name='patient-detail'),
     path('patients/<int:pk>', PatientDetailView.as_view(), name='patient-detail-noslash'),
+
+    # Doctor collection endpoints (GET list, POST create)
+    path('doctors/', DoctorListCreateView.as_view(), name='doctor-list-create'),
+    path('doctors', DoctorListCreateView.as_view(), name='doctor-list-create-noslash'),
+
+    # Doctor item endpoints (GET detail, PUT update, DELETE)
+    path('doctors/<int:pk>/', DoctorDetailView.as_view(), name='doctor-detail'),
+    path('doctors/<int:pk>', DoctorDetailView.as_view(), name='doctor-detail-noslash'),
 ]
