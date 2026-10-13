@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from core.models import Patient
+
 
 class RegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150, required=True)
@@ -54,3 +56,51 @@ class LoginSerializer(serializers.Serializer):
             'access': str(refresh.access_token),
             'refresh': str(refresh),
         }
+
+
+class PatientSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(max_length=150, required=True)
+    age = serializers.IntegerField(min_value=0, max_value=150, required=True)
+    gender = serializers.CharField(max_length=10, required=True)
+    phone = serializers.CharField(max_length=15, required=False, allow_blank=True, default='')
+    address = serializers.CharField(required=False, allow_blank=True, default='')
+    medical_history = serializers.CharField(required=False, allow_blank=True, default='')
+    created_by = serializers.SerializerMethodField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+    def get_created_by(self, obj):
+        if obj.created_by.first_name:
+            return obj.created_by.first_name
+        return obj.created_by.username
+
+    def validate_gender(self, value):
+        gender = value.strip().upper()
+
+        if gender in ['M', 'MALE']:
+            return 'M'
+        elif gender in ['F', 'FEMALE']:
+            return 'F'
+        elif gender in ['O', 'OTHER']:
+            return 'O'
+        else:
+            raise serializers.ValidationError("Gender must be 'M' (Male), 'F' (Female), or 'O' (Other).")
+
+    def create(self, validated_data):
+        return Patient.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.age = validated_data.get('age', instance.age)
+        instance.gender = validated_data.get('gender', instance.gender)
+        instance.phone = validated_data.get('phone', instance.phone)
+        instance.address = validated_data.get('address', instance.address)
+        instance.medical_history = validated_data.get('medical_history', instance.medical_history)
+        instance.save()
+        return instance
+
+
+# Backward compatibility alias
+PatientCreateSerializer = PatientSerializer
+
